@@ -1,9 +1,11 @@
 pub mod common;
 pub mod core;
+pub mod enriched;
 pub mod factory;
 pub mod protocols;
 
 pub use core::traits::{EventParser, UnifiedEvent};
+pub use enriched::*;
 pub use factory::{EventParserFactory, Protocol};
 
 /// 宏：简化 downcast_ref 模式匹配

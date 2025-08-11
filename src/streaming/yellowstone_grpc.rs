@@ -35,9 +35,12 @@ impl YellowstoneGrpc {
         x_token: Option<String>,
         config: StreamClientConfig,
     ) -> AnyResult<Self> {
-        let _ = rustls::crypto::ring::default_provider()
-            .install_default()
-            .map_err(|_| anyhow::anyhow!("Failed to install rustls crypto provider"))?;
+        // Install rustls crypto provider if not already installed
+        // Handle gracefully if already installed (common in multi-platform apps)
+        match rustls::crypto::ring::default_provider().install_default() {
+            Ok(_) => {}, // Successfully installed
+            Err(_) => {}, // Already installed or other non-critical error - continue anyway
+        }
         let metrics = Arc::new(Mutex::new(PerformanceMetrics::new()));
         let config_arc = Arc::new(config.clone());
 
