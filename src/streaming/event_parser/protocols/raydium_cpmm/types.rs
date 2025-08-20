@@ -2,6 +2,27 @@ use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum TradeDirection {
+    Buy,
+    Sell,
+}
+
+pub struct TradeInfo {
+    pub direction: TradeDirection,
+    pub user_address: String,
+    pub token_mint: String,
+    pub sol_amount: f64,
+    pub platform: String,
+}
+
+/// Trait for events that can provide trade information
+pub trait CopyTradeableEvent {
+    /// Extract trade information if this is a copy-tradeable event
+    /// Returns Some(TradeInfo) if copy-tradeable, None if not (e.g., token-to-token swap)
+    fn get_trade_info(&self) -> Option<TradeInfo>;
+}
+
 use crate::streaming::{
     event_parser::{
         common::EventMetadata,

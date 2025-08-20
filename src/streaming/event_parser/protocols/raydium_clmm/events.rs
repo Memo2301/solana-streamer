@@ -1,10 +1,14 @@
 use crate::streaming::event_parser::common::EventMetadata;
 use crate::streaming::event_parser::protocols::raydium_clmm::types::{PoolState, TickArrayState};
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{TradeDirection, TradeInfo, CopyTradeableEvent}; // Added for trade detection
 use crate::{
     impl_unified_event, streaming::event_parser::protocols::raydium_clmm::types::AmmConfig,
 };
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// 交易
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -28,6 +32,48 @@ pub struct RaydiumClmmSwapEvent {
 }
 
 impl_unified_event!(RaydiumClmmSwapEvent,);
+
+impl RaydiumClmmSwapEvent {
+    /// Extract trade information from metadata swap_data
+    /// For V1 events, we need to use the swap_data from metadata
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Extract from metadata swap_data if available
+        if let Some(swap_data) = &self.metadata.swap_data {
+            let from_mint = swap_data.from_mint.to_string();
+            let to_mint = swap_data.to_mint.to_string();
+            let user_address = self.payer.to_string();
+
+            let (direction, token_mint, sol_amount) = if from_mint == WSOL_MINT {
+                // Buying token with SOL
+                let sol_amount = swap_data.from_amount as f64 / 1_000_000_000.0;
+                (TradeDirection::Buy, to_mint, sol_amount)
+            } else if to_mint == WSOL_MINT {
+                // Selling token for SOL
+                let sol_amount = swap_data.to_amount as f64 / 1_000_000_000.0;
+                (TradeDirection::Sell, from_mint, sol_amount)
+            } else {
+                // Token-to-token swap, not copy-tradeable
+                return None;
+            };
+
+            Some(TradeInfo {
+                direction,
+                user_address,
+                token_mint,
+                sol_amount,
+                platform: "Raydium CLMM".to_string(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl CopyTradeableEvent for RaydiumClmmSwapEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 /// 交易v2
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -53,6 +99,48 @@ pub struct RaydiumClmmSwapV2Event {
     pub remaining_accounts: Vec<Pubkey>,
 }
 impl_unified_event!(RaydiumClmmSwapV2Event,);
+
+impl RaydiumClmmSwapV2Event {
+    /// Extract trade information using vault mint fields (V2 approach)
+    /// Uses input_vault_mint and output_vault_mint for direct detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let input_mint = self.input_vault_mint.to_string();
+        let output_mint = self.output_vault_mint.to_string();
+        let user_address = self.payer.to_string();
+
+        let (direction, token_mint, sol_amount) = if input_mint == WSOL_MINT {
+            // input_vault_mint is WSOL → Buying token with SOL → BUY
+            let sol_amount = self.amount as f64 / 1_000_000_000.0; // amount is input amount
+            (TradeDirection::Buy, output_mint, sol_amount)
+        } else if output_mint == WSOL_MINT {
+            // output_vault_mint is WSOL → Selling token for SOL → SELL
+            // For sell, we need the SOL received (other_amount_threshold or from swap_data)
+            let sol_amount = if let Some(swap_data) = &self.metadata.swap_data {
+                swap_data.to_amount as f64 / 1_000_000_000.0
+            } else {
+                self.other_amount_threshold as f64 / 1_000_000_000.0
+            };
+            (TradeDirection::Sell, input_mint, sol_amount)
+        } else {
+            // Neither input nor output vault mint is WSOL - token-to-token swap
+            return None;
+        };
+
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint,
+            sol_amount,
+            platform: "Raydium CLMM".to_string(),
+        })
+    }
+}
+
+impl CopyTradeableEvent for RaydiumClmmSwapV2Event {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 /// 关闭仓位
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

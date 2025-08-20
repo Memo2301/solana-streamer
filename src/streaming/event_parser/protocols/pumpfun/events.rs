@@ -5,6 +5,7 @@ use solana_sdk::pubkey::Pubkey;
 use crate::impl_unified_event;
 use crate::streaming::event_parser::common::EventMetadata;
 use crate::streaming::event_parser::protocols::pumpfun::types::{BondingCurve, Global};
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{TradeDirection, TradeInfo, CopyTradeableEvent};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct PumpFunCreateTokenEvent {
@@ -145,6 +146,36 @@ impl_unified_event!(
     creator_fee_basis_points,
     creator_fee
 );
+
+impl PumpFunTradeEvent {
+    /// Extract trade information with direction detection
+    /// Always returns Some(TradeInfo) since PumpFun trades are always SOL<->Token
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let direction = if self.is_buy {
+            TradeDirection::Buy
+        } else {
+            TradeDirection::Sell
+        };
+        
+        let user_address = self.user.to_string();
+        let token_mint = self.mint.to_string();
+        let sol_amount = self.sol_amount as f64 / 1_000_000_000.0;
+        
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint,
+            sol_amount,
+            platform: "PumpFun".to_string(),
+        })
+    }
+}
+
+impl CopyTradeableEvent for PumpFunTradeEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct PumpFunMigrateEvent {

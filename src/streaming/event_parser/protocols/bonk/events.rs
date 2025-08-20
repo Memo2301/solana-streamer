@@ -6,9 +6,15 @@ use crate::streaming::event_parser::protocols::bonk::types::{
 use crate::streaming::event_parser::protocols::bonk::{
     AmmFeeOn, GlobalConfig, PlatformConfig, PoolState,
 };
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{
+    TradeDirection as CopyTradeDirection, TradeInfo, CopyTradeableEvent,
+};
 use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// Trade event
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
@@ -92,6 +98,63 @@ impl_unified_event!(
     pool_status,
     exact_in
 );
+
+impl BonkTradeEvent {
+    /// Extract trade information with direction detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Check if this involves WSOL (copy-tradeable)
+        let base_mint = self.base_token_mint.to_string();
+        let quote_mint = self.quote_token_mint.to_string();
+        let user_address = self.payer.to_string();
+
+        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+            // Quote is WSOL, so we're trading Token ↔ WSOL
+            match self.trade_direction {
+                TradeDirection::Buy => {
+                    // Buy: WSOL → Token (amount_in is WSOL, amount_out is token)
+                    let sol_amount = self.amount_in as f64 / 1_000_000_000.0;
+                    (CopyTradeDirection::Buy, base_mint, sol_amount)
+                },
+                TradeDirection::Sell => {
+                    // Sell: Token → WSOL (amount_in is token, amount_out is WSOL)
+                    let sol_amount = self.amount_out as f64 / 1_000_000_000.0;
+                    (CopyTradeDirection::Sell, base_mint, sol_amount)
+                }
+            }
+        } else if base_mint == WSOL_MINT {
+            // Base is WSOL, so we're trading WSOL ↔ Token
+            match self.trade_direction {
+                TradeDirection::Buy => {
+                    // Buy: Token → WSOL? (unusual for Bonk, but handle it)
+                    let sol_amount = self.amount_out as f64 / 1_000_000_000.0;
+                    (CopyTradeDirection::Sell, quote_mint, sol_amount) // Actually selling the quote token
+                },
+                TradeDirection::Sell => {
+                    // Sell: WSOL → Token? (unusual for Bonk, but handle it)
+                    let sol_amount = self.amount_in as f64 / 1_000_000_000.0;
+                    (CopyTradeDirection::Buy, quote_mint, sol_amount) // Actually buying the quote token
+                }
+            }
+        } else {
+            // Neither base nor quote is WSOL - token-to-token swap, not copy-tradeable
+            return None;
+        };
+
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint,
+            sol_amount,
+            platform: "Bonk".to_string(),
+        })
+    }
+}
+
+impl CopyTradeableEvent for BonkTradeEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 /// Create pool event
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]

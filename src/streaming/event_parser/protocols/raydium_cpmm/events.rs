@@ -1,11 +1,14 @@
 use crate::streaming::event_parser::common::EventMetadata;
-use crate::streaming::event_parser::protocols::raydium_cpmm::types::PoolState;
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{PoolState, TradeDirection, TradeInfo, CopyTradeableEvent};
 use crate::{
     impl_unified_event, streaming::event_parser::protocols::raydium_cpmm::types::AmmConfig,
 };
 use borsh::BorshDeserialize;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// 交易
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
@@ -29,6 +32,46 @@ pub struct RaydiumCpmmSwapEvent {
 }
 
 impl_unified_event!(RaydiumCpmmSwapEvent,);
+
+impl RaydiumCpmmSwapEvent {
+    /// Extract trade information with direction detection
+    /// Returns Some(TradeInfo) if copy-tradeable, None if token-to-token swap
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let input_mint = self.input_token_mint.to_string();
+        let output_mint = self.output_token_mint.to_string();
+        let user_address = self.payer.to_string();
+        
+        // Determine trade direction and token mint
+        let (direction, token_mint) = if input_mint == WSOL_MINT {
+            (TradeDirection::Sell, output_mint) // Selling token for WSOL
+        } else if output_mint == WSOL_MINT {
+            (TradeDirection::Buy, input_mint) // Buying token with WSOL
+        } else {
+            return None; // Token-to-token swap, not copy-tradeable
+        };
+        
+        // Calculate SOL amount
+        let sol_amount = if direction == TradeDirection::Buy {
+            self.amount_in as f64 / 1_000_000_000.0 // Convert lamports to SOL
+        } else {
+            self.amount_out as f64 / 1_000_000_000.0
+        };
+        
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint,
+            sol_amount,
+            platform: "Raydium CPMM".to_string(),
+        })
+    }
+}
+
+impl CopyTradeableEvent for RaydiumCpmmSwapEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 /// 存款
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]

@@ -5,6 +5,10 @@ use solana_sdk::pubkey::Pubkey;
 use crate::impl_unified_event;
 use crate::streaming::event_parser::common::EventMetadata;
 use crate::streaming::event_parser::protocols::pumpswap::types::{GlobalConfig, Pool};
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{TradeDirection, TradeInfo, CopyTradeableEvent};
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 /// 买入事件
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
@@ -90,6 +94,51 @@ impl_unified_event!(
     coin_creator_fee
 );
 
+impl PumpSwapBuyEvent {
+    /// Extract trade information with direction detection
+    /// PumpSwapBuyEvent: Check SOL location to determine direction
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let base_mint = self.base_mint.to_string();
+        let quote_mint = self.quote_mint.to_string();
+        let user_address = self.user.to_string();
+
+        if base_mint == WSOL_MINT {
+            // SOL in base_mint + PumpSwapBuyEvent = SELL for copy trading
+            let token_mint = quote_mint; // quote = token being traded
+            let sol_amount = self.base_amount_out as f64 / 1_000_000_000.0; // base = SOL received
+            
+            Some(TradeInfo {
+                direction: TradeDirection::Sell,
+                user_address,
+                token_mint,
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+            })
+        } else if quote_mint == WSOL_MINT {
+            // SOL in quote_mint + PumpSwapBuyEvent = BUY for copy trading
+            let token_mint = base_mint; // base = token being traded
+            let sol_amount = self.quote_amount_in as f64 / 1_000_000_000.0; // quote = SOL spent
+            
+            Some(TradeInfo {
+                direction: TradeDirection::Buy,
+                user_address,
+                token_mint,
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+            })
+        } else {
+            // Neither base nor quote is WSOL - not copy-tradeable
+            None
+        }
+    }
+}
+
+impl CopyTradeableEvent for PumpSwapBuyEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
+
 /// 卖出事件
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct PumpSwapSellEvent {
@@ -168,6 +217,51 @@ impl_unified_event!(
     coin_creator_fee_basis_points,
     coin_creator_fee
 );
+
+impl PumpSwapSellEvent {
+    /// Extract trade information with direction detection
+    /// PumpSwapSellEvent: Check SOL location to determine direction
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let base_mint = self.base_mint.to_string();
+        let quote_mint = self.quote_mint.to_string();
+        let user_address = self.user.to_string();
+
+        if base_mint == WSOL_MINT {
+            // SOL in base_mint + PumpSwapSellEvent = BUY for copy trading
+            let token_mint = quote_mint; // quote = token being traded
+            let sol_amount = self.base_amount_in as f64 / 1_000_000_000.0; // base = SOL spent
+            
+            Some(TradeInfo {
+                direction: TradeDirection::Buy,
+                user_address,
+                token_mint,
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+            })
+        } else if quote_mint == WSOL_MINT {
+            // SOL in quote_mint + PumpSwapSellEvent = SELL for copy trading
+            let token_mint = base_mint; // base = token being traded
+            let sol_amount = self.quote_amount_out as f64 / 1_000_000_000.0; // quote = SOL received
+            
+            Some(TradeInfo {
+                direction: TradeDirection::Sell,
+                user_address,
+                token_mint,
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+            })
+        } else {
+            // Neither base nor quote is WSOL - not copy-tradeable
+            None
+        }
+    }
+}
+
+impl CopyTradeableEvent for PumpSwapSellEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 /// 创建池子事件
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
