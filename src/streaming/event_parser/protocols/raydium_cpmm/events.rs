@@ -43,9 +43,9 @@ impl RaydiumCpmmSwapEvent {
         
         // Determine trade direction and token mint
         let (direction, token_mint) = if input_mint == WSOL_MINT {
-            (TradeDirection::Sell, output_mint) // Selling token for WSOL
+            (TradeDirection::Buy, output_mint) // Spending WSOL = Buying token
         } else if output_mint == WSOL_MINT {
-            (TradeDirection::Buy, input_mint) // Buying token with WSOL
+            (TradeDirection::Sell, input_mint) // Receiving WSOL = Selling token
         } else {
             return None; // Token-to-token swap, not copy-tradeable
         };
