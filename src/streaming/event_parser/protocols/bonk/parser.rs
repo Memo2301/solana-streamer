@@ -182,6 +182,8 @@ impl BonkEventParser {
             quote_token_mint: accounts[10],
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Buy,
             ..Default::default()
         }))
@@ -218,6 +220,8 @@ impl BonkEventParser {
             quote_token_mint: accounts[10],
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Buy,
             ..Default::default()
         }))
@@ -254,6 +258,8 @@ impl BonkEventParser {
             quote_token_mint: accounts[10],
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Sell,
             ..Default::default()
         }))
@@ -290,6 +296,8 @@ impl BonkEventParser {
             quote_token_mint: accounts[10],
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Sell,
             ..Default::default()
         }))

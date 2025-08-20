@@ -63,6 +63,10 @@ pub struct BonkTradeEvent {
     #[borsh(skip)]
     pub quote_token_program: Pubkey,
     #[borsh(skip)]
+    pub fee_destination_1: Pubkey,
+    #[borsh(skip)]
+    pub fee_destination_2: Pubkey,
+    #[borsh(skip)]
     pub is_dev_create_token_trade: bool,
     #[borsh(skip)]
     pub is_bot: bool,
