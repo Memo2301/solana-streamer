@@ -1,7 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
-use solana_transaction_status::UiInstruction;
+use solana_transaction_status::{EncodedTransactionWithStatusMeta, UiInstruction};
 use std::{
     hash::{DefaultHasher, Hash, Hasher},
     str::FromStr,
@@ -335,9 +335,43 @@ pub struct SwapData {
     pub description: Option<String>,
 }
 
+/// Wrapper for EncodedTransactionWithStatusMeta that implements required traits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawTransactionWrapper {
+    pub inner: EncodedTransactionWithStatusMeta,
+}
+
+impl PartialEq for RawTransactionWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare based on serialized transaction data
+        match (serde_json::to_string(&self.inner), serde_json::to_string(&other.inner)) {
+            (Ok(a), Ok(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for RawTransactionWrapper {}
+
+impl BorshSerialize for RawTransactionWrapper {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        // Serialize as JSON string since BorshSerialize isn't implemented for EncodedTransactionWithStatusMeta
+        let json_str = serde_json::to_string(&self.inner).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        BorshSerialize::serialize(&json_str, writer)
+    }
+}
+
+impl BorshDeserialize for RawTransactionWrapper {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let json_str = String::deserialize_reader(reader)?;
+        let inner = serde_json::from_str(&json_str).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(RawTransactionWrapper { inner })
+    }
+}
+
 /// Event metadata
 #[derive(
-    Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BorshSerialize, BorshDeserialize,
 )]
 pub struct EventMetadata {
     pub id: String,
@@ -353,6 +387,29 @@ pub struct EventMetadata {
     pub transfer_datas: Vec<TransferData>,
     pub swap_data: Option<SwapData>,
     pub index: String,
+    /// Complete raw transaction data with pre/post balances, fees, etc.
+    pub raw_transaction: Option<RawTransactionWrapper>,
+}
+
+impl Default for EventMetadata {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            signature: String::new(),
+            slot: 0,
+            block_time: 0,
+            block_time_ms: 0,
+            program_received_time_ms: 0,
+            program_handle_time_consuming_ms: 0,
+            protocol: ProtocolType::default(),
+            event_type: EventType::default(),
+            program_id: Pubkey::default(),
+            transfer_datas: Vec::new(),
+            swap_data: None,
+            index: String::new(),
+            raw_transaction: None,
+        }
+    }
 }
 
 impl EventMetadata {
@@ -383,6 +440,39 @@ impl EventMetadata {
             transfer_datas: Vec::with_capacity(4), // Pre-allocate capacity
             swap_data: None,
             index,
+            raw_transaction: None,
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_raw_transaction(
+        id: String,
+        signature: String,
+        slot: u64,
+        block_time: i64,
+        block_time_ms: i64,
+        protocol: ProtocolType,
+        event_type: EventType,
+        program_id: Pubkey,
+        index: String,
+        program_received_time_ms: i64,
+        raw_transaction: Option<EncodedTransactionWithStatusMeta>,
+    ) -> Self {
+        Self {
+            id,
+            signature,
+            slot,
+            block_time,
+            block_time_ms,
+            program_received_time_ms,
+            program_handle_time_consuming_ms: 0,
+            protocol,
+            event_type,
+            program_id,
+            transfer_datas: Vec::with_capacity(4), // Pre-allocate capacity
+            swap_data: None,
+            index,
+            raw_transaction: raw_transaction.map(|tx| RawTransactionWrapper { inner: tx }),
         }
     }
 

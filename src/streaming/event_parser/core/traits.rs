@@ -206,6 +206,9 @@ pub trait EventParser: Send + Sync {
         program_received_time_ms: i64,
         bot_wallet: Option<Pubkey>,
     ) -> Result<Vec<Box<dyn UnifiedEvent>>> {
+        // Store the complete transaction for passing to event metadata
+        let complete_tx = tx.clone();
+        
         // TODO: bug - 待优化
         // // 生成缓存键
         // let cache_key = format!("{}_{}_{}", signature, slot.unwrap_or(0), program_received_time_ms);
