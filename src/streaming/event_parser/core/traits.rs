@@ -194,7 +194,7 @@ pub trait EventParser: Send + Sync {
             )
             .await
             .unwrap_or_else(|_e| vec![]);
-        Ok(self.process_events(events, bot_wallet))
+        Ok(self.process_events_with_raw_data(events, bot_wallet, None))
     }
 
     async fn parse_transaction(
@@ -206,7 +206,7 @@ pub trait EventParser: Send + Sync {
         program_received_time_ms: i64,
         bot_wallet: Option<Pubkey>,
     ) -> Result<Vec<Box<dyn UnifiedEvent>>> {
-        // Store the complete transaction for passing to event metadata
+        // Store the complete transaction for selective raw data inclusion
         let complete_tx = tx.clone();
         
         // TODO: bug - 待优化
@@ -387,7 +387,7 @@ pub trait EventParser: Send + Sync {
             }
         }
 
-        let result = self.process_events(instruction_events, bot_wallet);
+        let result = self.process_events_with_raw_data(instruction_events, bot_wallet, Some(complete_tx));
 
         // 缓存结果
         // PARSE_CACHE.set(cache_key, result.clone()).await;
@@ -475,6 +475,53 @@ pub trait EventParser: Send + Sync {
             );
         }
 
+        events
+    }
+
+    /// Process events with selective raw transaction data inclusion
+    /// Only includes raw transaction data for Raydium AMM V4 events to optimize performance
+    fn process_events_with_raw_data(
+        &self,
+        events: Vec<Box<dyn UnifiedEvent>>,
+        bot_wallet: Option<Pubkey>,
+        complete_tx: Option<EncodedTransactionWithStatusMeta>,
+    ) -> Vec<Box<dyn UnifiedEvent>> {
+        // First, process events normally
+        let processed_events = self.process_events(events, bot_wallet);
+        
+        // Then, selectively add raw transaction data for Raydium AMM V4 events
+        if let Some(tx) = complete_tx {
+            self.add_selective_raw_data(processed_events, tx)
+        } else {
+            processed_events
+        }
+    }
+
+    /// Add raw transaction data selectively only for Raydium AMM V4 events
+    fn add_selective_raw_data(
+        &self,
+        mut events: Vec<Box<dyn UnifiedEvent>>,
+        tx: EncodedTransactionWithStatusMeta,
+    ) -> Vec<Box<dyn UnifiedEvent>> {
+        use crate::streaming::event_parser::protocols::raydium_amm_v4::RaydiumAmmV4SwapEvent;
+        use crate::streaming::event_parser::common::types::RawTransactionWrapper;
+        
+        // Check if we have any Raydium AMM V4 events
+        let has_raydium_amm_v4 = events.iter().any(|event| {
+            event.as_any().downcast_ref::<RaydiumAmmV4SwapEvent>().is_some()
+        });
+        
+        if has_raydium_amm_v4 {
+            let raw_wrapper = RawTransactionWrapper::new(tx);
+            
+            // Only add raw transaction data to Raydium AMM V4 events
+            for event in &mut events {
+                if let Some(raydium_event) = event.as_any_mut().downcast_mut::<RaydiumAmmV4SwapEvent>() {
+                    raydium_event.metadata.raw_transaction = Some(raw_wrapper.clone());
+                }
+            }
+        }
+        
         events
     }
 

@@ -55,6 +55,10 @@ pub struct PumpSwapBuyEvent {
     pub coin_creator_vault_ata: Pubkey,
     #[borsh(skip)]
     pub coin_creator_vault_authority: Pubkey,
+    #[borsh(skip)]
+    pub fee_config: Pubkey,
+    #[borsh(skip)]
+    pub fee_program: Pubkey,
 }
 
 pub const PUMP_SWAP_BUY_EVENT_LOG_SIZE: usize = 385;
@@ -179,6 +183,10 @@ pub struct PumpSwapSellEvent {
     pub coin_creator_vault_ata: Pubkey,
     #[borsh(skip)]
     pub coin_creator_vault_authority: Pubkey,
+    #[borsh(skip)]
+    pub fee_config: Pubkey,
+    #[borsh(skip)]
+    pub fee_program: Pubkey,
 }
 
 pub const PUMP_SWAP_SELL_EVENT_LOG_SIZE: usize = 352;

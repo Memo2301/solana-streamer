@@ -341,6 +341,12 @@ pub struct RawTransactionWrapper {
     pub inner: EncodedTransactionWithStatusMeta,
 }
 
+impl RawTransactionWrapper {
+    pub fn new(inner: EncodedTransactionWithStatusMeta) -> Self {
+        Self { inner }
+    }
+}
+
 impl PartialEq for RawTransactionWrapper {
     fn eq(&self, other: &Self) -> bool {
         // Compare based on serialized transaction data
