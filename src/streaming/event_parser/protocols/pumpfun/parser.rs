@@ -180,31 +180,19 @@ impl PumpFunEventParser {
             return None;
         }
         
-        // DEBUG: Print account information
-        println!("🔍 [PUMPFUN_BUY_PARSER] Total accounts: {}", accounts.len());
-        for (i, account) in accounts.iter().enumerate() {
-            println!("  Account[{}]: {}", i, account);
-        }
-        
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let max_sol_cost = u64::from_le_bytes(data[8..16].try_into().unwrap());
         let mut metadata = metadata;
         metadata.set_id(format!("{}-{}-{}-{}", metadata.signature, accounts[2], accounts[6], true));
         
-        // Try different positions for fee accounts based on total account count
+        // Extract fee accounts based on account count
         let (fee_config, fee_program) = if accounts.len() >= 17 {
-            println!("🎯 [PUMPFUN_BUY_PARSER] Using positions 15,16 for fee accounts");
             (accounts.get(15).copied().unwrap_or_default(), accounts.get(16).copied().unwrap_or_default())
         } else if accounts.len() >= 16 {
-            println!("🎯 [PUMPFUN_BUY_PARSER] Using positions 14,15 for fee accounts");
             (accounts.get(14).copied().unwrap_or_default(), accounts.get(15).copied().unwrap_or_default())
         } else {
-            println!("⚠️ [PUMPFUN_BUY_PARSER] Not enough accounts for fee config/program, using defaults");
             (Pubkey::default(), Pubkey::default())
         };
-        
-        println!("📋 [PUMPFUN_BUY_PARSER] Extracted fee_config: {}", fee_config);
-        println!("📋 [PUMPFUN_BUY_PARSER] Extracted fee_program: {}", fee_program);
         
         Some(Box::new(PumpFunTradeEvent {
             metadata,
@@ -241,32 +229,19 @@ impl PumpFunEventParser {
             return None;
         }
         
-        // DEBUG: Print account information
-        println!("🔍 [PUMPFUN_SELL_PARSER] Total accounts: {}", accounts.len());
-        for (i, account) in accounts.iter().enumerate() {
-            println!("  Account[{}]: {}", i, account);
-        }
-        
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let min_sol_output = u64::from_le_bytes(data[8..16].try_into().unwrap());
         let mut metadata = metadata;
         metadata
             .set_id(format!("{}-{}-{}-{}", metadata.signature, accounts[2], accounts[6], false));
         
-        // Try different positions for fee accounts based on total account count
-        let (fee_config, fee_program) = if accounts.len() >= 17 {
-            println!("🎯 [PUMPFUN_SELL_PARSER] Using positions 15,16 for fee accounts");
-            (accounts.get(15).copied().unwrap_or_default(), accounts.get(16).copied().unwrap_or_default())
-        } else if accounts.len() >= 16 {
-            println!("🎯 [PUMPFUN_SELL_PARSER] Using positions 14,15 for fee accounts");
-            (accounts.get(14).copied().unwrap_or_default(), accounts.get(15).copied().unwrap_or_default())
+        // Extract fee accounts from sell transaction (14 accounts total)
+        // Positions: 0-11 = core accounts, 12 = fee_config, 13 = fee_program
+        let (fee_config, fee_program) = if accounts.len() >= 14 {
+            (accounts.get(12).copied().unwrap_or_default(), accounts.get(13).copied().unwrap_or_default())
         } else {
-            println!("⚠️ [PUMPFUN_SELL_PARSER] Not enough accounts for fee config/program, using defaults");
             (Pubkey::default(), Pubkey::default())
         };
-        
-        println!("📋 [PUMPFUN_SELL_PARSER] Extracted fee_config: {}", fee_config);
-        println!("📋 [PUMPFUN_SELL_PARSER] Extracted fee_program: {}", fee_program);
         
         Some(Box::new(PumpFunTradeEvent {
             metadata,
