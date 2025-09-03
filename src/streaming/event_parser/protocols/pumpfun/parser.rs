@@ -179,10 +179,33 @@ impl PumpFunEventParser {
         if data.len() < 16 || accounts.len() < 13 {
             return None;
         }
+        
+        // DEBUG: Print account information
+        println!("🔍 [PUMPFUN_BUY_PARSER] Total accounts: {}", accounts.len());
+        for (i, account) in accounts.iter().enumerate() {
+            println!("  Account[{}]: {}", i, account);
+        }
+        
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let max_sol_cost = u64::from_le_bytes(data[8..16].try_into().unwrap());
         let mut metadata = metadata;
         metadata.set_id(format!("{}-{}-{}-{}", metadata.signature, accounts[2], accounts[6], true));
+        
+        // Try different positions for fee accounts based on total account count
+        let (fee_config, fee_program) = if accounts.len() >= 17 {
+            println!("🎯 [PUMPFUN_BUY_PARSER] Using positions 15,16 for fee accounts");
+            (accounts.get(15).copied().unwrap_or_default(), accounts.get(16).copied().unwrap_or_default())
+        } else if accounts.len() >= 16 {
+            println!("🎯 [PUMPFUN_BUY_PARSER] Using positions 14,15 for fee accounts");
+            (accounts.get(14).copied().unwrap_or_default(), accounts.get(15).copied().unwrap_or_default())
+        } else {
+            println!("⚠️ [PUMPFUN_BUY_PARSER] Not enough accounts for fee config/program, using defaults");
+            (Pubkey::default(), Pubkey::default())
+        };
+        
+        println!("📋 [PUMPFUN_BUY_PARSER] Extracted fee_config: {}", fee_config);
+        println!("📋 [PUMPFUN_BUY_PARSER] Extracted fee_program: {}", fee_program);
+        
         Some(Box::new(PumpFunTradeEvent {
             metadata,
             global: accounts[0],
@@ -199,8 +222,8 @@ impl PumpFunEventParser {
             program: accounts[11],
             global_volume_accumulator: accounts[12],
             user_volume_accumulator: accounts[13],
-            fee_config: accounts.get(15).copied().unwrap_or_default(),
-            fee_program: accounts.get(16).copied().unwrap_or_default(),
+            fee_config,
+            fee_program,
             max_sol_cost,
             amount,
             is_buy: true,
@@ -217,11 +240,34 @@ impl PumpFunEventParser {
         if data.len() < 16 || accounts.len() < 11 {
             return None;
         }
+        
+        // DEBUG: Print account information
+        println!("🔍 [PUMPFUN_SELL_PARSER] Total accounts: {}", accounts.len());
+        for (i, account) in accounts.iter().enumerate() {
+            println!("  Account[{}]: {}", i, account);
+        }
+        
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let min_sol_output = u64::from_le_bytes(data[8..16].try_into().unwrap());
         let mut metadata = metadata;
         metadata
             .set_id(format!("{}-{}-{}-{}", metadata.signature, accounts[2], accounts[6], false));
+        
+        // Try different positions for fee accounts based on total account count
+        let (fee_config, fee_program) = if accounts.len() >= 17 {
+            println!("🎯 [PUMPFUN_SELL_PARSER] Using positions 15,16 for fee accounts");
+            (accounts.get(15).copied().unwrap_or_default(), accounts.get(16).copied().unwrap_or_default())
+        } else if accounts.len() >= 16 {
+            println!("🎯 [PUMPFUN_SELL_PARSER] Using positions 14,15 for fee accounts");
+            (accounts.get(14).copied().unwrap_or_default(), accounts.get(15).copied().unwrap_or_default())
+        } else {
+            println!("⚠️ [PUMPFUN_SELL_PARSER] Not enough accounts for fee config/program, using defaults");
+            (Pubkey::default(), Pubkey::default())
+        };
+        
+        println!("📋 [PUMPFUN_SELL_PARSER] Extracted fee_config: {}", fee_config);
+        println!("📋 [PUMPFUN_SELL_PARSER] Extracted fee_program: {}", fee_program);
+        
         Some(Box::new(PumpFunTradeEvent {
             metadata,
             global: accounts[0],
@@ -238,8 +284,8 @@ impl PumpFunEventParser {
             program: accounts[11],
             global_volume_accumulator: *accounts.get(12).unwrap_or(&Pubkey::default()),
             user_volume_accumulator: *accounts.get(13).unwrap_or(&Pubkey::default()),
-            fee_config: accounts.get(15).copied().unwrap_or_default(),
-            fee_program: accounts.get(16).copied().unwrap_or_default(),
+            fee_config,
+            fee_program,
             min_sol_output,
             amount,
             is_buy: false,
