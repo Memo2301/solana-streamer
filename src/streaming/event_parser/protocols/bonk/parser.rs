@@ -173,6 +173,7 @@ impl BonkEventParser {
             minimum_amount_out,
             share_fee_rate,
             payer: accounts[0],
+            platform_config: accounts[3], // Extract platform_config from instruction accounts
             pool_state: accounts[4],
             user_base_token: accounts[5],
             user_quote_token: accounts[6],
@@ -211,6 +212,7 @@ impl BonkEventParser {
             maximum_amount_in,
             share_fee_rate,
             payer: accounts[0],
+            platform_config: accounts[3], // Extract platform_config from instruction accounts
             pool_state: accounts[4],
             user_base_token: accounts[5],
             user_quote_token: accounts[6],
@@ -249,6 +251,7 @@ impl BonkEventParser {
             minimum_amount_out,
             share_fee_rate,
             payer: accounts[0],
+            platform_config: accounts[3], // Extract platform_config from instruction accounts
             pool_state: accounts[4],
             user_base_token: accounts[5],
             user_quote_token: accounts[6],
@@ -287,6 +290,7 @@ impl BonkEventParser {
             maximum_amount_in,
             share_fee_rate,
             payer: accounts[0],
+            platform_config: accounts[3], // Extract platform_config from instruction accounts
             pool_state: accounts[4],
             user_base_token: accounts[5],
             user_quote_token: accounts[6],

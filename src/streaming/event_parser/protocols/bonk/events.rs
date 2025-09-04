@@ -70,6 +70,8 @@ pub struct BonkTradeEvent {
     pub is_dev_create_token_trade: bool,
     #[borsh(skip)]
     pub is_bot: bool,
+    #[borsh(skip)]
+    pub platform_config: Pubkey,
 }
 
 pub const BONK_TRADE_EVENT_LOG_SIZE: usize = 32 + 8 * 13 + 1 + 1 + 1;
