@@ -115,6 +115,10 @@ pub struct PumpFunTradeEvent {
     pub global_volume_accumulator: Pubkey,
     #[borsh(skip)]
     pub user_volume_accumulator: Pubkey,
+    #[borsh(skip)]
+    pub fee_config: Pubkey,
+    #[borsh(skip)]
+    pub fee_program: Pubkey,
 }
 
 pub const PUMPFUN_TRADE_EVENT_LOG_SIZE: usize = 250;
@@ -145,6 +149,58 @@ impl_unified_event!(
     creator_fee_basis_points,
     creator_fee
 );
+
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{TradeDirection, TradeInfo, CopyTradeableEvent};
+
+impl PumpFunTradeEvent {
+    /// Extract trade information with direction detection
+    /// Always returns Some(TradeInfo) since PumpFun trades are always SOL<->Token
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        let direction = if self.is_buy {
+            TradeDirection::Buy
+        } else {
+            TradeDirection::Sell
+        };
+        
+        let user_address = self.user.to_string();
+        let token_mint = self.mint.to_string();
+        let sol_amount = self.sol_amount as f64 / 1_000_000_000.0;
+        
+        Some(TradeInfo {
+            direction: direction.clone(),
+            user_address,
+            token_mint: token_mint.clone(),
+            sol_amount,
+            platform: "PumpFun".to_string(),
+            input_mint: if direction == TradeDirection::Buy {
+                "So11111111111111111111111111111111111111112".to_string()
+            } else {
+                token_mint.clone()
+            },
+            output_mint: if direction == TradeDirection::Buy {
+                token_mint.clone()
+            } else {
+                "So11111111111111111111111111111111111111112".to_string()
+            },
+            amount_in: if direction == TradeDirection::Buy {
+                (sol_amount * 1_000_000_000.0) as u64
+            } else {
+                self.token_amount
+            },
+            amount_out: if direction == TradeDirection::Buy {
+                self.token_amount
+            } else {
+                (sol_amount * 1_000_000_000.0) as u64
+            },
+        })
+    }
+}
+
+impl CopyTradeableEvent for PumpFunTradeEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, BorshDeserialize)]
 pub struct PumpFunMigrateEvent {

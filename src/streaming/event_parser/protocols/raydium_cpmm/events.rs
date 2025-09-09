@@ -157,3 +157,58 @@ pub mod discriminators {
     pub const AMM_CONFIG: &[u8] = &[218, 244, 33, 104, 203, 203, 43, 111];
     pub const POOL_STATE: &[u8] = &[247, 237, 227, 245, 215, 195, 222, 70];
 }
+
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{
+    TradeDirection as TradeDirection, TradeInfo, CopyTradeableEvent,
+};
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+impl RaydiumCpmmSwapEvent {
+    /// Extract trade information with direction detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Check if this involves WSOL (copy-tradeable)
+        let input_mint = self.input_token_mint.to_string();
+        let output_mint = self.output_token_mint.to_string();
+        
+        // Only process if one of the tokens is WSOL
+        if input_mint != WSOL_MINT && output_mint != WSOL_MINT {
+            return None;
+        }
+        
+        // Determine trade direction and token
+        let (direction, token_mint) = if input_mint == WSOL_MINT {
+            // Input is WSOL, output is the token - buying token with SOL
+            (TradeDirection::Buy, output_mint.clone())
+        } else {
+            // Output is WSOL, input is the token - selling token for SOL
+            (TradeDirection::Sell, input_mint.clone())
+        };
+        
+        let user_address = self.payer.to_string();
+        let sol_amount = if input_mint == WSOL_MINT {
+            self.amount_in as f64 / 1_000_000_000.0  // Input is WSOL
+        } else {
+            self.amount_out as f64 / 1_000_000_000.0  // Output is WSOL
+        };
+        
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint: token_mint.clone(),
+            sol_amount,
+            platform: "RaydiumCpmm".to_string(),
+            input_mint: input_mint.clone(),
+            output_mint: output_mint.clone(),
+            amount_in: self.amount_in,
+            amount_out: self.amount_out,
+        })
+    }
+}
+
+impl CopyTradeableEvent for RaydiumCpmmSwapEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}

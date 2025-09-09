@@ -2,7 +2,20 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use crossbeam_queue::ArrayQueue;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{pubkey::Pubkey, signature::Signature};
+use solana_transaction_status::EncodedTransactionWithStatusMeta;
 use std::{borrow::Cow, fmt, str::FromStr, sync::Arc};
+
+/// Transfer data for tracking token movements
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransferData {
+    pub token_program: Pubkey,
+    pub source: Pubkey,
+    pub destination: Pubkey,
+    pub authority: Option<Pubkey>,
+    pub amount: u64,
+    pub decimals: Option<u8>,
+    pub mint: Option<Pubkey>,
+}
 
 use crate::{
     match_event,
@@ -25,6 +38,47 @@ use crate::{
 // Object pool size configuration
 const EVENT_METADATA_POOL_SIZE: usize = 1000;
 const TRANSFER_DATA_POOL_SIZE: usize = 2000;
+
+/// Wrapper for EncodedTransactionWithStatusMeta that implements required traits
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RawTransactionWrapper {
+    pub inner: EncodedTransactionWithStatusMeta,
+}
+
+impl RawTransactionWrapper {
+    pub fn new(inner: EncodedTransactionWithStatusMeta) -> Self {
+        Self { inner }
+    }
+}
+
+impl PartialEq for RawTransactionWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare based on serialized transaction data
+        match (serde_json::to_string(&self.inner), serde_json::to_string(&other.inner)) {
+            (Ok(a), Ok(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for RawTransactionWrapper {}
+
+impl BorshSerialize for RawTransactionWrapper {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        let serialized = serde_json::to_string(&self.inner)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        BorshSerialize::serialize(&serialized, writer)
+    }
+}
+
+impl BorshDeserialize for RawTransactionWrapper {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let serialized = String::deserialize_reader(reader)?;
+        let inner = serde_json::from_str(&serialized)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(RawTransactionWrapper { inner })
+    }
+}
 
 /// Event metadata object pool
 pub struct EventMetadataPool {
@@ -308,6 +362,9 @@ pub struct EventMetadata {
     pub swap_data: Option<SwapData>,
     pub outer_index: i64,
     pub inner_index: Option<i64>,
+    pub raw_transaction: Option<RawTransactionWrapper>,
+    pub transfer_datas: Vec<TransferData>,
+    pub id: String,
 }
 
 impl EventMetadata {
@@ -339,6 +396,9 @@ impl EventMetadata {
             outer_index,
             inner_index,
             transaction_index,
+            raw_transaction: None,
+            transfer_datas: Vec::new(),
+            id: format!("{}-{}-{}", signature, outer_index, inner_index.unwrap_or(0)),
         }
     }
 
@@ -691,5 +751,15 @@ pub fn parse_swap_data_from_next_grpc_instructions(
         Some(swap_data)
     } else {
         None
+    }
+}
+/// Extension trait for Signature to add is_empty method
+pub trait SignatureExt {
+    fn is_empty(&self) -> bool;
+}
+
+impl SignatureExt for solana_sdk::signature::Signature {
+    fn is_empty(&self) -> bool {
+        self.as_ref() == [0u8; 64]
     }
 }

@@ -55,6 +55,10 @@ pub struct PumpSwapBuyEvent {
     pub base_token_program: Pubkey,
     #[borsh(skip)]
     pub quote_token_program: Pubkey,
+    #[borsh(skip)]
+    pub fee_config: Pubkey,
+    #[borsh(skip)]
+    pub fee_program: Pubkey,
 }
 
 pub const PUMP_SWAP_BUY_EVENT_LOG_SIZE: usize = 385;
@@ -138,6 +142,10 @@ pub struct PumpSwapSellEvent {
     pub base_token_program: Pubkey,
     #[borsh(skip)]
     pub quote_token_program: Pubkey,
+    #[borsh(skip)]
+    pub fee_config: Pubkey,
+    #[borsh(skip)]
+    pub fee_program: Pubkey,
 }
 
 pub const PUMP_SWAP_SELL_EVENT_LOG_SIZE: usize = 352;
@@ -420,4 +428,97 @@ pub mod discriminators {
     // 账户鉴别器
     pub const GLOBAL_CONFIG_ACCOUNT: &[u8] = &[149, 8, 156, 202, 160, 252, 176, 217];
     pub const POOL_ACCOUNT: &[u8] = &[241, 154, 109, 4, 17, 177, 109, 188];
+}
+
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{
+    TradeDirection as TradeDirection, TradeInfo, CopyTradeableEvent,
+};
+
+// WSOL mint address for trade direction detection  
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+impl PumpSwapBuyEvent {
+    /// Extract trade information with direction detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Check if this involves WSOL (copy-tradeable)
+        let base_mint = self.base_mint.to_string();
+        let quote_mint = self.quote_mint.to_string();
+        
+        // Only process if one of the tokens is WSOL
+        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
+            return None;
+        }
+        
+        // PumpSwap buy event is always buying base token with quote token
+        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+            // Buying base token with SOL
+            (TradeDirection::Buy, base_mint.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
+        } else {
+            // This shouldn't happen for WSOL trades, but handle gracefully
+            return None;
+        };
+        
+        let user_address = self.user.to_string();
+        
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint: token_mint.clone(),
+            sol_amount,
+            platform: "PumpSwap".to_string(),
+            input_mint: quote_mint.clone(), // Quote is input for buy
+            output_mint: base_mint.clone(), // Base is output for buy
+            amount_in: self.user_quote_amount_in,
+            amount_out: self.base_amount_out,
+        })
+    }
+}
+
+impl CopyTradeableEvent for PumpSwapBuyEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
+}
+
+impl PumpSwapSellEvent {
+    /// Extract trade information with direction detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Check if this involves WSOL (copy-tradeable)
+        let base_mint = self.base_mint.to_string();
+        let quote_mint = self.quote_mint.to_string();
+        
+        // Only process if one of the tokens is WSOL
+        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
+            return None;
+        }
+        
+        // PumpSwap sell event is always selling base token for quote token
+        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+            // Selling base token for SOL
+            (TradeDirection::Sell, base_mint.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
+        } else {
+            // This shouldn't happen for WSOL trades, but handle gracefully  
+            return None;
+        };
+        
+        let user_address = self.user.to_string();
+        
+        Some(TradeInfo {
+            direction,
+            user_address,
+            token_mint: token_mint.clone(),
+            sol_amount,
+            platform: "PumpSwap".to_string(),
+            input_mint: base_mint.clone(), // Base is input for sell
+            output_mint: quote_mint.clone(), // Quote is output for sell
+            amount_in: self.base_amount_in,
+            amount_out: self.user_quote_amount_out,
+        })
+    }
+}
+
+impl CopyTradeableEvent for PumpSwapSellEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
 }

@@ -49,6 +49,10 @@ pub struct BonkTradeEvent {
     #[borsh(skip)]
     pub user_quote_token: Pubkey,
     #[borsh(skip)]
+    pub fee_destination_1: Pubkey,
+    #[borsh(skip)]
+    pub fee_destination_2: Pubkey,
+    #[borsh(skip)]
     pub base_vault: Pubkey,
     #[borsh(skip)]
     pub quote_vault: Pubkey,
@@ -336,4 +340,81 @@ pub mod discriminators {
     pub const POOL_STATE_ACCOUNT: &[u8] = &[247, 237, 227, 245, 215, 195, 222, 70];
     pub const GLOBAL_CONFIG_ACCOUNT: &[u8] = &[149, 8, 156, 202, 160, 252, 176, 217];
     pub const PLATFORM_CONFIG_ACCOUNT: &[u8] = &[160, 78, 128, 0, 248, 83, 230, 160];
+}
+
+use crate::streaming::event_parser::protocols::raydium_cpmm::types::{
+    TradeInfo, CopyTradeableEvent,
+};
+
+// WSOL mint address for trade direction detection
+const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+impl BonkTradeEvent {
+    /// Extract trade information with direction detection
+    pub fn get_trade_info(&self) -> Option<TradeInfo> {
+        // Check if this involves WSOL (copy-tradeable)
+        let base_mint = self.base_token_mint.to_string();
+        let quote_mint = self.quote_token_mint.to_string();
+        
+        // Only process if one of the tokens is WSOL
+        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
+            return None;
+        }
+        
+        // Determine trade direction and token
+        let (direction, token_mint) = if base_mint == WSOL_MINT {
+            // Base is WSOL, quote is the token - selling token for SOL
+            (TradeDirection::Sell, quote_mint.clone())
+        } else {
+            // Quote is WSOL, base is the token - buying token with SOL
+            (TradeDirection::Buy, base_mint.clone())
+        };
+        
+        let user_address = self.payer.to_string();
+        let sol_amount = if base_mint == WSOL_MINT {
+            self.amount_in as f64 / 1_000_000_000.0  // Base is WSOL
+        } else {
+            self.minimum_amount_out as f64 / 1_000_000_000.0  // Quote is WSOL
+        };
+        
+        use crate::streaming::event_parser::protocols::raydium_cpmm::types::TradeDirection as RaydiumTradeDirection;
+        let raydium_direction = match direction {
+            TradeDirection::Buy => RaydiumTradeDirection::Buy,
+            TradeDirection::Sell => RaydiumTradeDirection::Sell,
+        };
+        
+        Some(TradeInfo {
+            direction: raydium_direction,
+            user_address,
+            token_mint: token_mint.clone(),
+            sol_amount,
+            platform: "Bonk".to_string(),
+            input_mint: if direction == TradeDirection::Buy {
+                "So11111111111111111111111111111111111111112".to_string()
+            } else {
+                token_mint.clone()
+            },
+            output_mint: if direction == TradeDirection::Buy {
+                token_mint.clone()
+            } else {
+                "So11111111111111111111111111111111111111112".to_string()
+            },
+            amount_in: if direction == TradeDirection::Buy {
+                (sol_amount * 1_000_000_000.0) as u64
+            } else {
+                0 // Token amount - not available in bonk event
+            },
+            amount_out: if direction == TradeDirection::Buy {
+                0 // Token amount - not available in bonk event
+            } else {
+                (sol_amount * 1_000_000_000.0) as u64
+            },
+        })
+    }
+}
+
+impl CopyTradeableEvent for BonkTradeEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo> {
+        self.get_trade_info()
+    }
 }

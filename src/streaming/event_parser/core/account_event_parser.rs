@@ -288,6 +288,12 @@ impl AccountEventParser {
     ) -> Option<Box<dyn UnifiedEvent>> {
         use solana_program::program_pack::Pack;
         use spl_token::state::Mint;
+        
+        // Validate account data before attempting SPL token parsing
+        if account.data.is_empty() || account.data.len() < 82 {
+            return None;
+        }
+        
         if let Ok(mint) = Mint::unpack_from_slice(&account.data) {
             let mut event = TokenInfoEvent {
                 metadata,

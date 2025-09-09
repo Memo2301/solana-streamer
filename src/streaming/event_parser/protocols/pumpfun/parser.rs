@@ -165,6 +165,8 @@ impl PumpFunEventParser {
         }
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let max_sol_cost = u64::from_le_bytes(data[8..16].try_into().unwrap());
+        
+        // 🛡️ CRITICAL FIX: Use safe array access to prevent out-of-bounds panic
         Some(Box::new(PumpFunTradeEvent {
             metadata,
             global: accounts[0],
@@ -180,7 +182,9 @@ impl PumpFunEventParser {
             event_authority: accounts[10],
             program: accounts[11],
             global_volume_accumulator: accounts[12],
-            user_volume_accumulator: accounts[13],
+            user_volume_accumulator: *accounts.get(13).unwrap_or(&Pubkey::default()),
+            fee_config: *accounts.get(14).unwrap_or(&Pubkey::default()),
+            fee_program: *accounts.get(15).unwrap_or(&Pubkey::default()),
             max_sol_cost,
             amount,
             is_buy: true,
@@ -199,6 +203,7 @@ impl PumpFunEventParser {
         }
         let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
         let min_sol_output = u64::from_le_bytes(data[8..16].try_into().unwrap());
+        // 🛡️ CRITICAL FIX: Add missing fee fields for consistency
         Some(Box::new(PumpFunTradeEvent {
             metadata,
             global: accounts[0],
@@ -215,6 +220,8 @@ impl PumpFunEventParser {
             program: accounts[11],
             global_volume_accumulator: *accounts.get(12).unwrap_or(&Pubkey::default()),
             user_volume_accumulator: *accounts.get(13).unwrap_or(&Pubkey::default()),
+            fee_config: *accounts.get(14).unwrap_or(&Pubkey::default()),
+            fee_program: *accounts.get(15).unwrap_or(&Pubkey::default()),
             min_sol_output,
             amount,
             is_buy: false,

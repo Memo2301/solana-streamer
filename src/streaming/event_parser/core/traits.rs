@@ -5,10 +5,9 @@ use solana_sdk::{
     instruction::CompiledInstruction, pubkey::Pubkey, transaction::VersionedTransaction,
 };
 use solana_transaction_status::{
-    EncodedConfirmedTransactionWithStatusMeta, InnerInstruction, InnerInstructions,
-    TransactionWithStatusMeta, UiInstruction,
+    EncodedConfirmedTransactionWithStatusMeta, EncodedTransactionWithStatusMeta, InnerInstruction, InnerInstructions,
+    UiInstruction,
 };
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -872,6 +871,63 @@ pub trait EventParser: Send + Sync {
 
     /// 获取支持的程序ID列表
     fn supported_program_ids(&self) -> Vec<Pubkey>;
+
+    /// Process events with selective raw transaction data inclusion
+    /// Only includes raw transaction data for Raydium AMM V4 events to optimize performance
+    fn process_events_with_raw_data(
+        &self,
+        events: Vec<Box<dyn UnifiedEvent>>,
+        bot_wallet: Option<Pubkey>,
+        complete_tx: Option<EncodedTransactionWithStatusMeta>,
+    ) -> Vec<Box<dyn UnifiedEvent>> {
+        // First, process events normally
+        let processed_events = self.process_events(events, bot_wallet);
+        
+        // Then, selectively add raw transaction data for Raydium AMM V4 events
+        if let Some(tx) = complete_tx {
+            self.add_selective_raw_data(processed_events, tx)
+        } else {
+            processed_events
+        }
+    }
+
+    /// Add raw transaction data selectively only for Raydium AMM V4 events
+    fn add_selective_raw_data(
+        &self,
+        mut events: Vec<Box<dyn UnifiedEvent>>,
+        tx: EncodedTransactionWithStatusMeta,
+    ) -> Vec<Box<dyn UnifiedEvent>> {
+        use crate::streaming::event_parser::protocols::raydium_amm_v4::RaydiumAmmV4SwapEvent;
+        use crate::streaming::event_parser::common::types::RawTransactionWrapper;
+        
+        // Check if we have any Raydium AMM V4 events
+        let has_raydium_amm_v4 = events.iter().any(|event| {
+            event.as_any().downcast_ref::<RaydiumAmmV4SwapEvent>().is_some()
+        });
+        
+        if has_raydium_amm_v4 {
+            let raw_wrapper = RawTransactionWrapper::new(tx);
+            
+            // Only add raw transaction data to Raydium AMM V4 events
+            for event in &mut events {
+                if let Some(raydium_event) = event.as_any_mut().downcast_mut::<RaydiumAmmV4SwapEvent>() {
+                    raydium_event.metadata.raw_transaction = Some(raw_wrapper.clone());
+                }
+            }
+        }
+        
+        events
+    }
+
+    /// Process events (base method used by process_events_with_raw_data)
+    fn process_events(
+        &self,
+        events: Vec<Box<dyn UnifiedEvent>>,
+        bot_wallet: Option<Pubkey>,
+    ) -> Vec<Box<dyn UnifiedEvent>> {
+        // Default implementation - processes each event
+        events.into_iter().map(|event| process_event(event, bot_wallet)).collect()
+    }
 }
 
 // 为Box<dyn UnifiedEvent>实现Clone

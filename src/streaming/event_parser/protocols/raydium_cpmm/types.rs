@@ -115,3 +115,28 @@ pub fn pool_state_parser(
         None
     }
 }
+
+// Trade detection types for copy trading functionality
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TradeDirection {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TradeInfo {
+    pub direction: TradeDirection,
+    pub user_address: String,
+    pub token_mint: String,
+    pub sol_amount: f64,
+    pub platform: String,
+    pub input_mint: String,
+    pub output_mint: String,
+    pub amount_in: u64,
+    pub amount_out: u64,
+}
+
+/// Trait for events that can provide trade information for copy trading
+pub trait CopyTradeableEvent {
+    fn get_trade_info(&self) -> Option<TradeInfo>;
+}
