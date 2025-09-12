@@ -186,19 +186,88 @@ impl EventProcessor {
                 let grpc_tx = transaction_pretty.grpc_tx;
 
                 let parser = self.get_parser();
-                let adapter_callback = self.create_adapter_callback();
-                parser
-                    .parse_grpc_transaction_owned(
-                        grpc_tx,
-                        signature,
-                        Some(slot),
-                        block_time,
-                        recv_us,
-                        bot_wallet,
-                        transaction_index,
-                        adapter_callback,
-                    )
-                    .await?;
+                
+                // 🔧 CRITICAL FIX: Use raw transaction data callback that sets raw_transaction for RaydiumAmmV4
+                // Check if we have RaydiumAmmV4 protocols that need full raw data
+                let has_raydium_amm_v4 = self.protocols.contains(&crate::streaming::event_parser::Protocol::RaydiumAmmV4);
+                
+                if has_raydium_amm_v4 {
+                    // Create callback that sets raw transaction data for RaydiumAmmV4 events
+                    let callback = self.callback.clone().unwrap();
+                    let metrics_manager = self.metrics_manager.clone();
+                    let grpc_tx_for_callback = grpc_tx.clone();
+                    
+                    let raw_data_callback = Arc::new(move |event: &Box<dyn crate::streaming::event_parser::core::traits::UnifiedEvent>| {
+                        // Check if this is a RaydiumAmmV4 event and add raw transaction data
+                        use crate::streaming::event_parser::protocols::raydium_amm_v4::RaydiumAmmV4SwapEvent;
+                        if let Some(raydium_event) = event.as_any().downcast_ref::<RaydiumAmmV4SwapEvent>() {
+                            // Convert to mutable and set raw transaction data
+                            let mut raydium_event_mut = raydium_event.clone();
+                            
+                            // Convert SubscribeUpdateTransactionInfo to EncodedTransactionWithStatusMeta
+                            if let Ok(tx_with_meta) = yellowstone_grpc_proto::convert_from::create_tx_with_meta(grpc_tx_for_callback.clone()) {
+                                if let Ok(encoded_tx) = tx_with_meta.encode(
+                                    solana_transaction_status::UiTransactionEncoding::Base64, 
+                                    Some(u8::MAX), 
+                                    true
+                                ) {
+                                    use crate::streaming::event_parser::common::types::RawTransactionWrapper;
+                                    let raw_wrapper = RawTransactionWrapper::new(encoded_tx);
+                                    raydium_event_mut.metadata.raw_transaction = Some(raw_wrapper);
+                                    println!("✅ [RAYDIUM_AMV4_FIX] Set raw transaction data for RaydiumAmmV4SwapEvent");
+                                }
+                            }
+                            
+                            // Clone the event with raw data and invoke original callback
+                            let event_with_raw_data: Box<dyn crate::streaming::event_parser::core::traits::UnifiedEvent> = Box::new(raydium_event_mut);
+                            let processing_time_us = event_with_raw_data.handle_us() as f64;
+                            callback(event_with_raw_data);
+                            metrics_manager.update_metrics(crate::streaming::common::MetricsEventType::Transaction, 1, processing_time_us);
+                        } else {
+                            // For non-RaydiumAmmV4 events, use normal callback
+                            let processing_time_us = event.handle_us() as f64;
+                            callback(event.clone());
+                            metrics_manager.update_metrics(crate::streaming::common::MetricsEventType::Transaction, 1, processing_time_us);
+                        }
+                    });
+                    
+                    // Parse with the modified callback that adds raw data
+                    parser
+                        .parse_grpc_transaction(
+                            grpc_tx,
+                            signature,
+                            Some(slot),
+                            block_time,
+                            recv_us,
+                            bot_wallet,
+                            transaction_index,
+                            raw_data_callback,
+                        )
+                        .await?;
+                } else {
+                    // Lightweight parsing for other protocols - create correct callback signature
+                    let callback = self.callback.clone().unwrap();
+                    let metrics_manager = self.metrics_manager.clone();
+                    
+                    let lightweight_callback = Arc::new(move |event: &Box<dyn crate::streaming::event_parser::core::traits::UnifiedEvent>| {
+                        let processing_time_us = event.handle_us() as f64;
+                        callback(event.clone());
+                        metrics_manager.update_metrics(crate::streaming::common::MetricsEventType::Transaction, 1, processing_time_us);
+                    });
+                    
+                    parser
+                        .parse_grpc_transaction(
+                            grpc_tx,
+                            signature,
+                            Some(slot),
+                            block_time,
+                            recv_us,
+                            bot_wallet,
+                            transaction_index,
+                            lightweight_callback,
+                        )
+                        .await?;
+                }
             }
             EventPretty::BlockMeta(block_meta_pretty) => {
                 self.metrics_manager.add_block_meta_process_count();

@@ -350,31 +350,45 @@ use crate::streaming::event_parser::protocols::raydium_cpmm::types::{
 const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 
 impl BonkTradeEvent {
-    /// Extract trade information with direction detection
+    /// Extract trade information with direction detection (FIXED: using self.trade_direction)
     pub fn get_trade_info(&self) -> Option<TradeInfo> {
         // Check if this involves WSOL (copy-tradeable)
         let base_mint = self.base_token_mint.to_string();
         let quote_mint = self.quote_token_mint.to_string();
-        
-        // Only process if one of the tokens is WSOL
-        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
-            return None;
-        }
-        
-        // Determine trade direction and token
-        let (direction, token_mint) = if base_mint == WSOL_MINT {
-            // Base is WSOL, quote is the token - selling token for SOL
-            (TradeDirection::Sell, quote_mint.clone())
-        } else {
-            // Quote is WSOL, base is the token - buying token with SOL
-            (TradeDirection::Buy, base_mint.clone())
-        };
-        
         let user_address = self.payer.to_string();
-        let sol_amount = if base_mint == WSOL_MINT {
-            self.amount_in as f64 / 1_000_000_000.0  // Base is WSOL
+
+        // CRITICAL FIX: Use self.trade_direction from event data, not inferred from token positions
+        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+            // Quote is WSOL, so we're trading Token ↔ WSOL
+            match self.trade_direction {
+                TradeDirection::Buy => {
+                    // Buy: WSOL → Token (amount_in is WSOL, amount_out is token)
+                    let sol_amount = self.amount_in as f64 / 1_000_000_000.0;
+                    (TradeDirection::Buy, base_mint, sol_amount)
+                },
+                TradeDirection::Sell => {
+                    // Sell: Token → WSOL (amount_in is token, amount_out is WSOL)
+                    let sol_amount = self.amount_out as f64 / 1_000_000_000.0;
+                    (TradeDirection::Sell, base_mint, sol_amount)
+                }
+            }
+        } else if base_mint == WSOL_MINT {
+            // Base is WSOL, so we're trading WSOL ↔ Token
+            match self.trade_direction {
+                TradeDirection::Buy => {
+                    // Buy: Token → WSOL? (unusual for Bonk, but handle it)
+                    let sol_amount = self.amount_out as f64 / 1_000_000_000.0;
+                    (TradeDirection::Sell, quote_mint, sol_amount) // Actually selling the quote token
+                },
+                TradeDirection::Sell => {
+                    // Sell: WSOL → Token? (unusual for Bonk, but handle it)
+                    let sol_amount = self.amount_in as f64 / 1_000_000_000.0;
+                    (TradeDirection::Buy, quote_mint, sol_amount) // Actually buying the quote token
+                }
+            }
         } else {
-            self.minimum_amount_out as f64 / 1_000_000_000.0  // Quote is WSOL
+            // Neither base nor quote is WSOL - token-to-token swap, not copy-tradeable
+            return None;
         };
         
         use crate::streaming::event_parser::protocols::raydium_cpmm::types::TradeDirection as RaydiumTradeDirection;

@@ -180,8 +180,8 @@ impl BonkEventParser {
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
             system_program: accounts[15],
-            platform_associated_account: accounts[16],
-            creator_associated_account: accounts[17],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Buy,
             ..Default::default()
         }))
@@ -218,8 +218,8 @@ impl BonkEventParser {
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
             system_program: accounts[15],
-            platform_associated_account: accounts[16],
-            creator_associated_account: accounts[17],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Buy,
             ..Default::default()
         }))
@@ -256,8 +256,8 @@ impl BonkEventParser {
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
             system_program: accounts[15],
-            platform_associated_account: accounts[16],
-            creator_associated_account: accounts[17],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Sell,
             ..Default::default()
         }))
@@ -294,8 +294,8 @@ impl BonkEventParser {
             base_token_program: accounts[11],
             quote_token_program: accounts[12],
             system_program: accounts[15],
-            platform_associated_account: accounts[16],
-            creator_associated_account: accounts[17],
+            fee_destination_1: accounts.get(16).copied().unwrap_or_default(),
+            fee_destination_2: accounts.get(17).copied().unwrap_or_default(),
             trade_direction: TradeDirection::Sell,
             ..Default::default()
         }))

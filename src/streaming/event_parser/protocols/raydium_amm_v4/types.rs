@@ -96,10 +96,10 @@ pub fn amm_info_parser(
     if let Some(amm_info) = amm_info_decode(&account.data[..AMM_INFO_SIZE]) {
         Some(Box::new(RaydiumAmmV4AmmInfoAccountEvent {
             metadata,
-            pubkey: account.pubkey,
+            pubkey: account.pubkey.to_string(),
             executable: account.executable,
             lamports: account.lamports,
-            owner: account.owner,
+            owner: account.owner.to_string(),
             rent_epoch: account.rent_epoch,
             amm_info: amm_info,
         }))

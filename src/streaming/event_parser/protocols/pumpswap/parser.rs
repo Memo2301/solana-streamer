@@ -168,14 +168,12 @@ impl PumpSwapEventParser {
             quote_mint: accounts[4],
             user_base_token_account: accounts[5],
             user_quote_token_account: accounts[6],
-            pool_base_token_account: accounts[7],
-            pool_quote_token_account: accounts[8],
             protocol_fee_recipient: accounts[9],
             protocol_fee_recipient_token_account: accounts[10],
-            base_token_program: accounts[11],
-            quote_token_program: accounts[12],
             coin_creator_vault_ata: accounts.get(17).copied().unwrap_or_default(),
             coin_creator_vault_authority: accounts.get(18).copied().unwrap_or_default(),
+            fee_config: accounts.get(21).copied().unwrap_or_default(),
+            fee_program: accounts.get(22).copied().unwrap_or_default(),
             ..Default::default()
         }))
     }
@@ -203,14 +201,12 @@ impl PumpSwapEventParser {
             quote_mint: accounts[4],
             user_base_token_account: accounts[5],
             user_quote_token_account: accounts[6],
-            pool_base_token_account: accounts[7],
-            pool_quote_token_account: accounts[8],
             protocol_fee_recipient: accounts[9],
             protocol_fee_recipient_token_account: accounts[10],
-            base_token_program: accounts[11],
-            quote_token_program: accounts[12],
             coin_creator_vault_ata: accounts.get(17).copied().unwrap_or_default(),
             coin_creator_vault_authority: accounts.get(18).copied().unwrap_or_default(),
+            fee_config: accounts.get(21).copied().unwrap_or_default(),
+            fee_program: accounts.get(22).copied().unwrap_or_default(),
             ..Default::default()
         }))
     }
@@ -247,8 +243,6 @@ impl PumpSwapEventParser {
             user_base_token_account: accounts[6],
             user_quote_token_account: accounts[7],
             user_pool_token_account: accounts[8],
-            pool_base_token_account: accounts[9],
-            pool_quote_token_account: accounts[10],
             coin_creator,
             ..Default::default()
         }))
@@ -280,8 +274,6 @@ impl PumpSwapEventParser {
             user_base_token_account: accounts[6],
             user_quote_token_account: accounts[7],
             user_pool_token_account: accounts[8],
-            pool_base_token_account: accounts[9],
-            pool_quote_token_account: accounts[10],
             ..Default::default()
         }))
     }
@@ -312,8 +304,6 @@ impl PumpSwapEventParser {
             user_base_token_account: accounts[6],
             user_quote_token_account: accounts[7],
             user_pool_token_account: accounts[8],
-            pool_base_token_account: accounts[9],
-            pool_quote_token_account: accounts[10],
             ..Default::default()
         }))
     }

@@ -44,17 +44,9 @@ pub struct PumpSwapBuyEvent {
     #[borsh(skip)]
     pub quote_mint: Pubkey,
     #[borsh(skip)]
-    pub pool_base_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_quote_token_account: Pubkey,
-    #[borsh(skip)]
     pub coin_creator_vault_ata: Pubkey,
     #[borsh(skip)]
     pub coin_creator_vault_authority: Pubkey,
-    #[borsh(skip)]
-    pub base_token_program: Pubkey,
-    #[borsh(skip)]
-    pub quote_token_program: Pubkey,
     #[borsh(skip)]
     pub fee_config: Pubkey,
     #[borsh(skip)]
@@ -131,17 +123,9 @@ pub struct PumpSwapSellEvent {
     #[borsh(skip)]
     pub quote_mint: Pubkey,
     #[borsh(skip)]
-    pub pool_base_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_quote_token_account: Pubkey,
-    #[borsh(skip)]
     pub coin_creator_vault_ata: Pubkey,
     #[borsh(skip)]
     pub coin_creator_vault_authority: Pubkey,
-    #[borsh(skip)]
-    pub base_token_program: Pubkey,
-    #[borsh(skip)]
-    pub quote_token_program: Pubkey,
     #[borsh(skip)]
     pub fee_config: Pubkey,
     #[borsh(skip)]
@@ -212,10 +196,6 @@ pub struct PumpSwapCreatePoolEvent {
     pub coin_creator: Pubkey,
     #[borsh(skip)]
     pub user_pool_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_base_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_quote_token_account: Pubkey,
 }
 
 pub const PUMP_SWAP_CREATE_POOL_EVENT_LOG_SIZE: usize = 325;
@@ -276,10 +256,6 @@ pub struct PumpSwapDepositEvent {
     pub base_mint: Pubkey,
     #[borsh(skip)]
     pub quote_mint: Pubkey,
-    #[borsh(skip)]
-    pub pool_base_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_quote_token_account: Pubkey,
 }
 
 pub const PUMP_SWAP_DEPOSIT_EVENT_LOG_SIZE: usize = 248;
@@ -336,10 +312,6 @@ pub struct PumpSwapWithdrawEvent {
     pub base_mint: Pubkey,
     #[borsh(skip)]
     pub quote_mint: Pubkey,
-    #[borsh(skip)]
-    pub pool_base_token_account: Pubkey,
-    #[borsh(skip)]
-    pub pool_quote_token_account: Pubkey,
 }
 
 pub const PUMP_SWAP_WITHDRAW_EVENT_LOG_SIZE: usize = 248;
