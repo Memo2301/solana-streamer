@@ -214,7 +214,6 @@ impl EventProcessor {
                                     use crate::streaming::event_parser::common::types::RawTransactionWrapper;
                                     let raw_wrapper = RawTransactionWrapper::new(encoded_tx);
                                     raydium_event_mut.metadata.raw_transaction = Some(raw_wrapper);
-                                    println!("✅ [RAYDIUM_AMV4_FIX] Set raw transaction data for RaydiumAmmV4SwapEvent");
                                 }
                             }
                             
