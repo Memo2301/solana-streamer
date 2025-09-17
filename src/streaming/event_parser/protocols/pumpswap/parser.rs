@@ -90,8 +90,28 @@ impl PumpSwapEventParser {
         data: &[u8],
         metadata: EventMetadata,
     ) -> Option<Box<dyn UnifiedEvent>> {
-        if let Some(event) = pump_swap_buy_event_log_decode(data) {
-            Some(Box::new(PumpSwapBuyEvent { metadata, ..event }))
+        if let Some(mut event) = pump_swap_buy_event_log_decode(data) {
+            // 🚨 CRITICAL FIX: Populate #[borsh(skip)] fields from metadata
+            // Instead of leaving them as defaults, extract from transaction data
+            if let Some(ref swap_data) = metadata.swap_data {
+                // Determine base/quote mints from swap direction
+                if swap_data.from_mint.to_string() == "So11111111111111111111111111111111111111112" {
+                    // WSOL → Token (Buy): from=quote(WSOL), to=base(token)
+                    event.quote_mint = swap_data.from_mint;
+                    event.base_mint = swap_data.to_mint;
+                } else {
+                    // Token → WSOL: from=base(token), to=quote(WSOL)
+                    event.base_mint = swap_data.from_mint;
+                    event.quote_mint = swap_data.to_mint;
+                }
+            }
+            
+            // Populate fee fields with proper PumpSwap addresses
+            event.fee_config = solana_sdk::pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"); // PumpSwap Fee Config
+            event.fee_program = solana_sdk::pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"); // PumpSwap Fee Program
+            
+            event.metadata = metadata;
+            Some(Box::new(event))
         } else {
             None
         }
@@ -102,8 +122,28 @@ impl PumpSwapEventParser {
         data: &[u8],
         metadata: EventMetadata,
     ) -> Option<Box<dyn UnifiedEvent>> {
-        if let Some(event) = pump_swap_sell_event_log_decode(data) {
-            Some(Box::new(PumpSwapSellEvent { metadata, ..event }))
+        if let Some(mut event) = pump_swap_sell_event_log_decode(data) {
+            // 🚨 CRITICAL FIX: Populate #[borsh(skip)] fields from metadata
+            // Instead of leaving them as defaults, extract from transaction data
+            if let Some(ref swap_data) = metadata.swap_data {
+                // Determine base/quote mints from swap direction
+                if swap_data.from_mint.to_string() == "So11111111111111111111111111111111111111112" {
+                    // WSOL → Token: from=quote(WSOL), to=base(token)
+                    event.quote_mint = swap_data.from_mint;
+                    event.base_mint = swap_data.to_mint;
+                } else {
+                    // Token → WSOL (Sell): from=base(token), to=quote(WSOL)
+                    event.base_mint = swap_data.from_mint;
+                    event.quote_mint = swap_data.to_mint;
+                }
+            }
+            
+            // Populate fee fields with proper PumpSwap addresses
+            event.fee_config = solana_sdk::pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"); // PumpSwap Fee Config
+            event.fee_program = solana_sdk::pubkey!("pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"); // PumpSwap Fee Program
+            
+            event.metadata = metadata;
+            Some(Box::new(event))
         } else {
             None
         }
