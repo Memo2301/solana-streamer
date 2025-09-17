@@ -420,35 +420,25 @@ impl PumpSwapBuyEvent {
             let to_mint_str = swap_data.to_mint.to_string();
             
             // 🔍 DEBUG: Add detailed logging to understand the swap direction
-            println!("🔧 [PUMPSWAP_DEBUG] PumpSwapBuyEvent: from_mint={}, to_mint={}", from_mint_str, to_mint_str);
-            println!("🔧 [PUMPSWAP_DEBUG] user={}, user_quote_amount_in={}, base_amount_out={}", 
-                self.user, self.user_quote_amount_in, self.base_amount_out);
-            
             // Only process if one of the tokens is WSOL (copy-tradeable)
             if from_mint_str != WSOL_MINT && to_mint_str != WSOL_MINT {
-                println!("🔧 [PUMPSWAP_DEBUG] Neither mint is WSOL, skipping");
                 return None;
             }
             
             // 🔧 CORRECTED LOGIC: Determine direction based on WSOL position, NOT event name
             let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT && to_mint_str != WSOL_MINT {
                 // from_mint=WSOL, to_mint=Token → BUY (spending SOL to get token)
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: BUY - spending WSOL to get token {}", &to_mint_str[..8]);
                 (TradeDirection::Buy, to_mint_str.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
             } else if from_mint_str != WSOL_MINT && to_mint_str == WSOL_MINT {
                 // from_mint=Token, to_mint=WSOL → SELL (spending token to get SOL)
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: SELL - selling token {} for WSOL", &from_mint_str[..8]);
                 (TradeDirection::Sell, from_mint_str.clone(), self.base_amount_out as f64 / 1_000_000_000.0)
             } else {
                 // Neither mint is WSOL, not copy-tradeable
-                println!("🔧 [PUMPSWAP_DEBUG] No WSOL detected in either direction");
                 return None;
             };
             
             let user_address = self.user.to_string();
             
-            println!("🔧 [PUMPSWAP_DEBUG] Final result: direction={:?}, token_mint={}, sol_amount={:.6}, user={}",
-                direction, &token_mint[..8], sol_amount, &user_address[..8]);
             
             Some(TradeInfo {
                 direction,
@@ -462,8 +452,6 @@ impl PumpSwapBuyEvent {
                 amount_out: self.base_amount_out,
             })
         } else {
-            println!("🔧 [PUMPSWAP_DEBUG] No swap_data available for BuyEvent, using fallback logic");
-            
             // Fallback to original logic if swap_data is not available
             let base_mint = self.base_mint.to_string();
             let quote_mint = self.quote_mint.to_string();
@@ -515,36 +503,26 @@ impl PumpSwapSellEvent {
             let from_mint_str = swap_data.from_mint.to_string();
             let to_mint_str = swap_data.to_mint.to_string();
             
-            // 🔍 DEBUG: Add detailed logging to understand the swap direction
-            println!("🔧 [PUMPSWAP_DEBUG] PumpSwapSellEvent: from_mint={}, to_mint={}", from_mint_str, to_mint_str);
-            println!("🔧 [PUMPSWAP_DEBUG] user={}, base_amount_in={}, user_quote_amount_out={}", 
-                self.user, self.base_amount_in, self.user_quote_amount_out);
             
             // Only process if one of the tokens is WSOL (copy-tradeable)
             if from_mint_str != WSOL_MINT && to_mint_str != WSOL_MINT {
-                println!("🔧 [PUMPSWAP_DEBUG] Neither mint is WSOL, skipping");
                 return None;
             }
             
             // 🔧 CORRECTED LOGIC: Determine direction based on WSOL position, NOT event name
             let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT && to_mint_str != WSOL_MINT {
                 // from_mint=WSOL, to_mint=Token → BUY (spending SOL to get token)
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: BUY - spending WSOL to get token {}", &to_mint_str[..8]);
                 (TradeDirection::Buy, to_mint_str.clone(), self.base_amount_in as f64 / 1_000_000_000.0)
             } else if from_mint_str != WSOL_MINT && to_mint_str == WSOL_MINT {
                 // from_mint=Token, to_mint=WSOL → SELL (spending token to get SOL)
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: SELL - selling token {} for WSOL", &from_mint_str[..8]);
                 (TradeDirection::Sell, from_mint_str.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
             } else {
                 // Neither mint is WSOL, not copy-tradeable
-                println!("🔧 [PUMPSWAP_DEBUG] No WSOL detected in either direction");
                 return None;
             };
             
             let user_address = self.user.to_string();
             
-            println!("🔧 [PUMPSWAP_DEBUG] Final result: direction={:?}, token_mint={}, sol_amount={:.6}, user={}",
-                direction, &token_mint[..8], sol_amount, &user_address[..8]);
             
             Some(TradeInfo {
                 direction,
@@ -558,8 +536,6 @@ impl PumpSwapSellEvent {
                 amount_out: self.user_quote_amount_out,
             })
         } else {
-            println!("🔧 [PUMPSWAP_DEBUG] No swap_data available, using fallback logic");
-            
             // Fallback to original logic if swap_data is not available
             let base_mint = self.base_mint.to_string();
             let quote_mint = self.quote_mint.to_string();
