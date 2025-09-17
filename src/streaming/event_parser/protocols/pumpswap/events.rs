@@ -412,37 +412,76 @@ const WSOL_MINT: &str = "So11111111111111111111111111111111111111112";
 impl PumpSwapBuyEvent {
     /// Extract trade information with direction detection
     pub fn get_trade_info(&self) -> Option<TradeInfo> {
-        // Check if this involves WSOL (copy-tradeable)
-        let base_mint = self.base_mint.to_string();
-        let quote_mint = self.quote_mint.to_string();
-        
-        // Only process if one of the tokens is WSOL
-        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
-            return None;
-        }
-        
-        // PumpSwap buy event is always buying base token with quote token
-        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
-            // Buying base token with SOL
-            (TradeDirection::Buy, base_mint.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
+        // 🔧 FIX: Use swap_data from metadata instead of empty base_mint/quote_mint fields
+        // The base_mint and quote_mint fields are marked as #[borsh(skip)] so they're empty
+        // but the actual mint information is available in metadata.swap_data
+        if let Some(swap_data) = &self.metadata.swap_data {
+            let from_mint_str = swap_data.from_mint.to_string();
+            let to_mint_str = swap_data.to_mint.to_string();
+            
+            // Only process if one of the tokens is WSOL (copy-tradeable)
+            if from_mint_str != WSOL_MINT && to_mint_str != WSOL_MINT {
+                return None;
+            }
+            
+            // PumpSwap buy event: buying to_mint with from_mint
+            let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT {
+                // Buying token with SOL
+                (TradeDirection::Buy, to_mint_str.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
+            } else if to_mint_str == WSOL_MINT {
+                // This would be selling token for SOL, but this is a buy event
+                return None;
+            } else {
+                // Neither mint is WSOL, not copy-tradeable
+                return None;
+            };
+            
+            let user_address = self.user.to_string();
+            
+            Some(TradeInfo {
+                direction,
+                user_address,
+                token_mint: token_mint.clone(),
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+                input_mint: from_mint_str, // SOL spent
+                output_mint: to_mint_str, // Token received
+                amount_in: self.user_quote_amount_in,
+                amount_out: self.base_amount_out,
+            })
         } else {
-            // This shouldn't happen for WSOL trades, but handle gracefully
-            return None;
-        };
-        
-        let user_address = self.user.to_string();
-        
-        Some(TradeInfo {
-            direction,
-            user_address,
-            token_mint: token_mint.clone(),
-            sol_amount,
-            platform: "PumpSwap".to_string(),
-            input_mint: quote_mint.clone(), // Quote is input for buy
-            output_mint: base_mint.clone(), // Base is output for buy
-            amount_in: self.user_quote_amount_in,
-            amount_out: self.base_amount_out,
-        })
+            // Fallback to original logic if swap_data is not available
+            let base_mint = self.base_mint.to_string();
+            let quote_mint = self.quote_mint.to_string();
+            
+            // Only process if one of the tokens is WSOL
+            if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
+                return None;
+            }
+            
+            // PumpSwap buy event is always buying base token with quote token
+            let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+                // Buying base token with SOL
+                (TradeDirection::Buy, base_mint.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
+            } else {
+                // This shouldn't happen for WSOL trades, but handle gracefully
+                return None;
+            };
+            
+            let user_address = self.user.to_string();
+            
+            Some(TradeInfo {
+                direction,
+                user_address,
+                token_mint: token_mint.clone(),
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+                input_mint: quote_mint.clone(), // Quote is input for buy
+                output_mint: base_mint.clone(), // Base is output for buy
+                amount_in: self.user_quote_amount_in,
+                amount_out: self.base_amount_out,
+            })
+        }
     }
 }
 
@@ -455,37 +494,76 @@ impl CopyTradeableEvent for PumpSwapBuyEvent {
 impl PumpSwapSellEvent {
     /// Extract trade information with direction detection
     pub fn get_trade_info(&self) -> Option<TradeInfo> {
-        // Check if this involves WSOL (copy-tradeable)
-        let base_mint = self.base_mint.to_string();
-        let quote_mint = self.quote_mint.to_string();
-        
-        // Only process if one of the tokens is WSOL
-        if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
-            return None;
-        }
-        
-        // PumpSwap sell event is always selling base token for quote token
-        let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
-            // Selling base token for SOL
-            (TradeDirection::Sell, base_mint.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
+        // 🔧 FIX: Use swap_data from metadata instead of empty base_mint/quote_mint fields
+        // The base_mint and quote_mint fields are marked as #[borsh(skip)] so they're empty
+        // but the actual mint information is available in metadata.swap_data
+        if let Some(swap_data) = &self.metadata.swap_data {
+            let from_mint_str = swap_data.from_mint.to_string();
+            let to_mint_str = swap_data.to_mint.to_string();
+            
+            // Only process if one of the tokens is WSOL (copy-tradeable)
+            if from_mint_str != WSOL_MINT && to_mint_str != WSOL_MINT {
+                return None;
+            }
+            
+            // PumpSwap sell event: selling from_mint for to_mint
+            let (direction, token_mint, sol_amount) = if to_mint_str == WSOL_MINT {
+                // Selling token for SOL
+                (TradeDirection::Sell, from_mint_str.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
+            } else if from_mint_str == WSOL_MINT {
+                // This would be buying token with SOL, but this is a sell event
+                return None;
+            } else {
+                // Neither mint is WSOL, not copy-tradeable
+                return None;
+            };
+            
+            let user_address = self.user.to_string();
+            
+            Some(TradeInfo {
+                direction,
+                user_address,
+                token_mint: token_mint.clone(),
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+                input_mint: from_mint_str, // Token being sold
+                output_mint: to_mint_str, // SOL received
+                amount_in: self.base_amount_in,
+                amount_out: self.user_quote_amount_out,
+            })
         } else {
-            // This shouldn't happen for WSOL trades, but handle gracefully  
-            return None;
-        };
-        
-        let user_address = self.user.to_string();
-        
-        Some(TradeInfo {
-            direction,
-            user_address,
-            token_mint: token_mint.clone(),
-            sol_amount,
-            platform: "PumpSwap".to_string(),
-            input_mint: base_mint.clone(), // Base is input for sell
-            output_mint: quote_mint.clone(), // Quote is output for sell
-            amount_in: self.base_amount_in,
-            amount_out: self.user_quote_amount_out,
-        })
+            // Fallback to original logic if swap_data is not available
+            let base_mint = self.base_mint.to_string();
+            let quote_mint = self.quote_mint.to_string();
+            
+            // Only process if one of the tokens is WSOL
+            if base_mint != WSOL_MINT && quote_mint != WSOL_MINT {
+                return None;
+            }
+            
+            // PumpSwap sell event is always selling base token for quote token
+            let (direction, token_mint, sol_amount) = if quote_mint == WSOL_MINT {
+                // Selling base token for SOL
+                (TradeDirection::Sell, base_mint.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
+            } else {
+                // This shouldn't happen for WSOL trades, but handle gracefully  
+                return None;
+            };
+            
+            let user_address = self.user.to_string();
+            
+            Some(TradeInfo {
+                direction,
+                user_address,
+                token_mint: token_mint.clone(),
+                sol_amount,
+                platform: "PumpSwap".to_string(),
+                input_mint: base_mint.clone(), // Base is input for sell
+                output_mint: quote_mint.clone(), // Quote is output for sell
+                amount_in: self.base_amount_in,
+                amount_out: self.user_quote_amount_out,
+            })
+        }
     }
 }
 
