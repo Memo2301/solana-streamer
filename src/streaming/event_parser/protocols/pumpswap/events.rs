@@ -430,15 +430,14 @@ impl PumpSwapBuyEvent {
                 return None;
             }
             
-            // 🔧 CORRECTED LOGIC: Check both directions for PumpSwap buy events
-            let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT {
-                // Buying token (to_mint) with SOL (from_mint)  
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: Buying {} with SOL", &to_mint_str[..8]);
+            // 🔧 CORRECTED LOGIC: Determine direction based on WSOL position, NOT event name
+            let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT && to_mint_str != WSOL_MINT {
+                // from_mint=WSOL, to_mint=Token → BUY (spending SOL to get token)
+                println!("🔧 [PUMPSWAP_DEBUG] Detected: BUY - spending WSOL to get token {}", &to_mint_str[..8]);
                 (TradeDirection::Buy, to_mint_str.clone(), self.user_quote_amount_in as f64 / 1_000_000_000.0)
-            } else if to_mint_str == WSOL_MINT {
-                // This seems backwards: from_mint is token, to_mint is WSOL in a "buy" event
-                // This suggests it's actually a sell: selling token (from_mint) for SOL (to_mint)
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: from_mint is token, to_mint is WSOL - treating as sell {} for SOL", &from_mint_str[..8]);
+            } else if from_mint_str != WSOL_MINT && to_mint_str == WSOL_MINT {
+                // from_mint=Token, to_mint=WSOL → SELL (spending token to get SOL)
+                println!("🔧 [PUMPSWAP_DEBUG] Detected: SELL - selling token {} for WSOL", &from_mint_str[..8]);
                 (TradeDirection::Sell, from_mint_str.clone(), self.base_amount_out as f64 / 1_000_000_000.0)
             } else {
                 // Neither mint is WSOL, not copy-tradeable
@@ -527,16 +526,15 @@ impl PumpSwapSellEvent {
                 return None;
             }
             
-            // 🔧 CORRECTED LOGIC: Check both directions for PumpSwap sell events
-            let (direction, token_mint, sol_amount) = if to_mint_str == WSOL_MINT {
-                // Selling token (from_mint) for SOL (to_mint)  
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: Selling {} for SOL", &from_mint_str[..8]);
+            // 🔧 CORRECTED LOGIC: Determine direction based on WSOL position, NOT event name
+            let (direction, token_mint, sol_amount) = if from_mint_str == WSOL_MINT && to_mint_str != WSOL_MINT {
+                // from_mint=WSOL, to_mint=Token → BUY (spending SOL to get token)
+                println!("🔧 [PUMPSWAP_DEBUG] Detected: BUY - spending WSOL to get token {}", &to_mint_str[..8]);
+                (TradeDirection::Buy, to_mint_str.clone(), self.base_amount_in as f64 / 1_000_000_000.0)
+            } else if from_mint_str != WSOL_MINT && to_mint_str == WSOL_MINT {
+                // from_mint=Token, to_mint=WSOL → SELL (spending token to get SOL)
+                println!("🔧 [PUMPSWAP_DEBUG] Detected: SELL - selling token {} for WSOL", &from_mint_str[..8]);
                 (TradeDirection::Sell, from_mint_str.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
-            } else if from_mint_str == WSOL_MINT {
-                // This could be: Selling SOL (from_mint) for token (to_mint) - which is actually a BUY
-                // But since this is a PumpSwapSellEvent, let's treat it as selling token for SOL
-                println!("🔧 [PUMPSWAP_DEBUG] Detected: from_mint is WSOL, to_mint is token - treating as sell {} for SOL", &to_mint_str[..8]);
-                (TradeDirection::Sell, to_mint_str.clone(), self.user_quote_amount_out as f64 / 1_000_000_000.0)
             } else {
                 // Neither mint is WSOL, not copy-tradeable
                 println!("🔧 [PUMPSWAP_DEBUG] No WSOL detected in either direction");
